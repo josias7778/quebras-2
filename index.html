@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Registro de Manutenção por Voz</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background-color: #f2f2f2;
+    }
+    #output {
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: #fff;
+      border: 1px solid #ccc;
+    }
+    button {
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h2>Registro de Troca de Peças (por Voz)</h2>
+  <button onclick="startProcess()">Iniciar Registro</button>
+
+  <div id="output"></div>
+
+  <script>
+    const scriptURL = "https://script.google.com/macros/s/AKfycbxSRqkLmp81g5z2soStanpsMBS1XGdT_IOPrMhMZZ0Ux-GUv1DTVMXUfFHXQDslyrI78Q/exec";
+
+    const campos = [
+      { nome: "Linha", valor: "" },
+      { nome: "Código da Peça", valor: "" },
+      { nome: "Tipo da Peça", valor: "" },
+      { nome: "Local de Instalação", valor: "" },
+      { nome: "Observação", valor: "" }
+    ];
+
+    let currentCampo = 0;
+    const outputDiv = document.getElementById("output");
+
+    function startProcess() {
+      currentCampo = 0;
+      campos.forEach(c => c.valor = "");
+      outputDiv.innerHTML = "";
+      pedirCampo();
+    }
+
+    function pedirCampo() {
+      if (currentCampo < campos.length) {
+        const campo = campos[currentCampo].nome;
+        speak(`Fale o campo: ${campo}`);
+        reconhecerVoz(campo);
+      } else {
+        enviarDados();
+      }
+    }
+
+    function speak(texto) {
+      const utterance = new SpeechSynthesisUtterance(texto);
+      utterance.lang = "pt-BR";
+      speechSynthesis.speak(utterance);
+    }
+
+    function reconhecerVoz(campo) {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = "pt-BR";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.start();
+
+      recognition.onresult = (event) => {
+        const resultado = event.results[0][0].transcript;
+        campos[currentCampo].valor = resultado;
+        outputDiv.innerHTML += `<p><strong>${campo}:</strong> ${resultado}</p>`;
+        currentCampo++;
+        setTimeout(pedirCampo, 1000);
+      };
+
+      recognition.onerror = (event) => {
+        outputDiv.innerHTML += `<p style="color:red;">Erro: ${event.error}</p>`;
+      };
+    }
+
+    function enviarDados() {
+      const agora = new Date();
+      const data = agora.toLocaleDateString("pt-BR");
+      const hora = agora.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+
+      const payload = {
+        data: data,
+        hora: hora,
+        linha: campos[0].valor,
+        codigo: campos[1].valor,
+        tipo: campos[2].valor,
+        local: campos[3].valor,
+        observacao: campos[4].valor
+      };
+
+      fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" }
+      })
+      .then(() => {
+        speak("Dados enviados com sucesso");
+        outputDiv.innerHTML += "<p style='color:green;'>Enviado com sucesso!</p>";
+      })
+      .catch(() => {
+        speak("Erro ao enviar os dados");
+        outputDiv.innerHTML += "<p style='color:red;'>Erro ao enviar os dados.</p>";
+      });
+    }
+  </script>
+</body>
+</html>
